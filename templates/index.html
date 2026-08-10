@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cube 3D Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0d0f13;
+    --panel: #14171e;
+    --panel-2: #1a1e27;
+    --border: #262b36;
+    --text: #e8eaf0;
+    --text-dim: #838ba0;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --sans: 'Space Grotesk', system-ui, sans-serif;
+    --u: #f2f2ec; --d: #f5c518; --l: #ff7a1a; --r: #e1362c; --f: #17a34a; --b: #2f6fe0;
+  }
+  *{ box-sizing: border-box; }
+  html, body{ margin:0; height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); }
+  #app{ display:flex; height:100vh; min-height:520px; }
+  #stage{ position:relative; flex:1 1 auto; min-width:0; touch-action:none; }
+  #stage canvas{ display:block; width:100%; height:100%; }
+  #hint{
+    position:absolute; left:16px; bottom:14px; font-family:var(--mono); font-size:11px;
+    color:var(--text-dim); letter-spacing:.02em; pointer-events:none;
+  }
+  #panel{
+    width:300px; flex:0 0 300px; background:var(--panel); border-left:1px solid var(--border);
+    display:flex; flex-direction:column; overflow-y:auto;
+  }
+  header{ padding:18px 18px 14px; border-bottom:1px solid var(--border); }
+  header .eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--text-dim); text-transform:uppercase; }
+  header h1{ margin:4px 0 0; font-size:19px; font-weight:700; letter-spacing:-.01em; }
+  .section{ padding:14px 18px; border-bottom:1px solid var(--border); }
+  .section-label{ font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px; }
+  .faces{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .face-group{ background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:8px; border-left:3px solid var(--face-color); }
+  .face-name{ font-family:var(--mono); font-weight:700; font-size:12px; margin-bottom:6px; color:var(--face-color); }
+  .face-btns{ display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+  button.move{
+    font-family:var(--mono); font-size:12px; font-weight:500; padding:7px 0;
+    background:#0f1218; color:var(--text); border:1px solid var(--border); border-radius:5px;
+    cursor:pointer; transition:background .12s ease, transform .06s ease, border-color .12s ease;
+  }
+  button.move:hover{ background:#1c212c; border-color:var(--face-color); }
+  button.move:active{ transform:scale(.94); }
+  button.move:disabled{ opacity:.35; cursor:default; }
+  .actions{ display:flex; gap:8px; }
+  button.action{
+    flex:1; font-family:var(--sans); font-weight:600; font-size:13px; padding:10px 0;
+    border-radius:7px; cursor:pointer; border:1px solid var(--border); transition:filter .12s ease, transform .06s ease;
+  }
+  button.action:active{ transform:scale(.97); }
+  #scramble{ background:var(--text); color:#0d0f13; border:none; }
+  #reset{ background:transparent; color:var(--text); }
+  button.action:hover{ filter:brightness(1.08); }
+  #log{
+    flex:1; min-height:80px; padding:14px 18px; font-family:var(--mono); font-size:12px;
+    color:var(--text-dim); line-height:1.7; overflow-y:auto;
+  }
+  #log .mv{ color:var(--text); }
+  #log .empty{ color:var(--text-dim); font-style:italic; }
+  @media (max-width: 720px){
+    #app{ flex-direction:column; }
+    #stage{ flex:1 1 55%; min-height:280px; }
+    #panel{ width:100%; flex:1 1 45%; border-left:none; border-top:1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="hint">drag to rotate view</div>
+  </div>
+  <div id="panel">
+    <header>
+      <div class="eyebrow">Cube Engine · Visualizer</div>
+      <h1>3D Viewer</h1>
+    </header>
+
+    <div class="section">
+      <div class="section-label">Moves</div>
+      <div class="faces" id="faces"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Controls</div>
+      <div class="actions">
+        <button class="action" id="scramble">Scramble</button>
+        <button class="action" id="reset">Reset</button>
+      </div>
+    </div>
+
+    <div id="log"><span class="empty">no moves yet</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  // ---------- move table ----------
+  // axis: which local axis the layer is defined on and rotates about
+  // layer: which grid coordinate (-1,0,1) along that axis is selected
+  // dir: sign of rotation (in radians, right-hand rule) for the base (non-prime) move
+  const MOVES = {
+    U: { axis:'y', layer: 1, dir:-1, color:'var(--u)' },
+    D: { axis:'y', layer:-1, dir: 1, color:'var(--d)' },
+    L: { axis:'x', layer:-1, dir: 1, color:'var(--l)' },
+    R: { axis:'x', layer: 1, dir:-1, color:'var(--r)' },
+    F: { axis:'z', layer: 1, dir:-1, color:'var(--f)' },
+    B: { axis:'z', layer:-1, dir: 1, color:'var(--b)' },
+  };
+  const FACE_ORDER = ['U','D','L','R','F','B'];
+
+  // ---------- build move buttons ----------
+  const facesEl = document.getElementById('faces');
+  FACE_ORDER.forEach(face => {
+    const group = document.createElement('div');
+    group.className = 'face-group';
+    group.style.setProperty('--face-color', MOVES[face].color);
+    group.innerHTML = `
+      <div class="face-name">${face}</div>
+      <div class="face-btns">
+        <button class="move" data-face="${face}" data-prime="0" data-double="0">${face}</button>
+        <button class="move" data-face="${face}" data-prime="1" data-double="0">${face}'</button>
+        <button class="move" data-face="${face}" data-prime="0" data-double="1">${face}2</button>
+      </div>`;
+    facesEl.appendChild(group);
+  });
+
+  // ---------- three.js setup ----------
+  const stage = document.getElementById('stage');
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(5.4, 4.6, 7.2);
+  camera.lookAt(0,0,0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  stage.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 0.85);
+  key.position.set(6, 9, 6);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+  fill.position.set(-6, -3, -4);
+  scene.add(fill);
+
+  const worldGroup = new THREE.Group();
+  worldGroup.rotation.set(-0.45, 0.65, 0);
+  scene.add(worldGroup);
+
+  // ---------- cube construction ----------
+  const SPACING = 1.06;
+  const SIZE = 0.98;
+  const STICKER = {
+    px:'#e1362c', nx:'#ff7a1a', py:'#f2f2ec', ny:'#f5c518', pz:'#17a34a', nz:'#2f6fe0'
+  };
+  const BODY = 0x0b0d11;
+
+  let cubelets = [];
+
+  function makeCubelet(ix, iy, iz){
+    const geo = new THREE.BoxGeometry(SIZE, SIZE, SIZE);
+    const matFor = (facing, cond) => new THREE.MeshStandardMaterial({
+      color: cond ? new THREE.Color(STICKER[facing]) : BODY,
+      roughness: 0.55, metalness: 0.05
+    });
+    const materials = [
+      matFor('px', ix ===  1),
+      matFor('nx', ix === -1),
+      matFor('py', iy ===  1),
+      matFor('ny', iy === -1),
+      matFor('pz', iz ===  1),
+      matFor('nz', iz === -1),
+    ];
+    const mesh = new THREE.Mesh(geo, materials);
+    mesh.position.set(ix*SPACING, iy*SPACING, iz*SPACING);
+    mesh.userData = { ix, iy, iz };
+
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: 0x05060a })
+    );
+    mesh.add(edges);
+    return mesh;
+  }
+
+  function buildCube(){
+    cubelets.forEach(m => worldGroup.remove(m));
+    cubelets = [];
+    for(let ix=-1; ix<=1; ix++){
+      for(let iy=-1; iy<=1; iy++){
+        for(let iz=-1; iz<=1; iz++){
+          if(ix===0 && iy===0 && iz===0) continue; // hidden core, real cubes don't have this piece
+          const c = makeCubelet(ix, iy, iz);
+          worldGroup.add(c);
+          cubelets.push(c);
+        }
+      }
+    }
+  }
+  buildCube();
+
+  // ---------- move animation ----------
+  let queue = [];
+  let animating = false;
+
+  function easeInOutQuad(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+
+  function runMove(face, prime, double){
+    const { axis, layer, dir } = MOVES[face];
+    const selected = cubelets.filter(c => c.userData[axis === 'x' ? 'ix' : axis === 'y' ? 'iy' : 'iz'] === layer);
+
+    const moveGroup = new THREE.Group();
+    worldGroup.add(moveGroup);
+    selected.forEach(m => moveGroup.add(m));
+
+    const target = (Math.PI/2) * dir * (prime ? -1 : 1) * (double ? 2 : 1);
+    const duration = double ? 320 : 240;
+    const start = performance.now();
+
+    setButtonsEnabled(false);
+
+    function step(now){
+      const t = Math.min(1, (now - start) / duration);
+      const eased = easeInOutQuad(t);
+      moveGroup.rotation[axis] = target * eased;
+      if(t < 1){
+        requestAnimationFrame(step);
+      } else {
+        finalizeMove(moveGroup, selected, axis);
+        logMove(face, prime, double);
+        animating = false;
+        setButtonsEnabled(true);
+        processQueue();
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function finalizeMove(moveGroup, selected, axis){
+    worldGroup.updateMatrixWorld(true);
+    const wgWorldQuat = new THREE.Quaternion();
+    worldGroup.getWorldQuaternion(wgWorldQuat);
+    const wgInv = wgWorldQuat.clone().invert();
+    const snap = a => Math.round(a / (Math.PI/2)) * (Math.PI/2);
+
+    selected.forEach(mesh => {
+      const worldPos = new THREE.Vector3();
+      const worldQuat = new THREE.Quaternion();
+      mesh.getWorldPosition(worldPos);
+      mesh.getWorldQuaternion(worldQuat);
+
+      moveGroup.remove(mesh);
+      worldGroup.add(mesh);
+
+      const localPos = worldGroup.worldToLocal(worldPos);
+      localPos.x = Math.round(localPos.x / SPACING) * SPACING;
+      localPos.y = Math.round(localPos.y / SPACING) * SPACING;
+      localPos.z = Math.round(localPos.z / SPACING) * SPACING;
+      mesh.position.copy(localPos);
+
+      const localQuat = wgInv.clone().multiply(worldQuat);
+      const eul = new THREE.Euler().setFromQuaternion(localQuat, 'XYZ');
+      mesh.rotation.set(snap(eul.x), snap(eul.y), snap(eul.z));
+
+      mesh.userData.ix = Math.round(mesh.position.x / SPACING);
+      mesh.userData.iy = Math.round(mesh.position.y / SPACING);
+      mesh.userData.iz = Math.round(mesh.position.z / SPACING);
+    });
+    worldGroup.remove(moveGroup);
+  }
+
+  function processQueue(){
+    if(animating || queue.length === 0) return;
+    animating = true;
+    const { face, prime, double } = queue.shift();
+    runMove(face, prime, double);
+  }
+
+  function queueMove(face, prime, double){
+    queue.push({ face, prime, double });
+    processQueue();
+  }
+
+  // ---------- move log ----------
+  const logEl = document.getElementById('log');
+  let history = [];
+  function logMove(face, prime, double){
+    const notation = face + (double ? '2' : prime ? "'" : '');
+    history.push(notation);
+    if(history.length > 200) history.shift();
+    logEl.innerHTML = history.map(n => `<span class="mv">${n}</span>`).join(' ');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function clearLog(){
+    history = [];
+    logEl.innerHTML = '<span class="empty">no moves yet</span>';
+  }
+
+  // ---------- buttons ----------
+  const allMoveButtons = () => document.querySelectorAll('button.move');
+  function setButtonsEnabled(enabled){
+    allMoveButtons().forEach(b => b.disabled = !enabled && queue.length === 0 ? false : !enabled);
+  }
+  allMoveButtons().forEach(btn => {
+    btn.addEventListener('click', () => {
+      queueMove(btn.dataset.face, btn.dataset.prime === '1', btn.dataset.double === '1');
+    });
+  });
+
+  document.getElementById('scramble').addEventListener('click', () => {
+    const faces = FACE_ORDER;
+    let last = null;
+    for(let i=0; i<20; i++){
+      let face;
+      do { face = faces[Math.floor(Math.random()*faces.length)]; } while(face === last);
+      last = face;
+      const prime = Math.random() < 0.5;
+      const double = Math.random() < 0.15;
+      queueMove(face, prime, double);
+    }
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    queue = [];
+    animating = false;
+    setButtonsEnabled(true);
+    buildCube();
+    clearLog();
+  });
+
+  // ---------- drag to orbit ----------
+  let dragging = false, lastX = 0, lastY = 0, userInteracted = false;
+  const dom = renderer.domElement;
+  dom.style.cursor = 'grab';
+
+  dom.addEventListener('pointerdown', e => {
+    dragging = true; userInteracted = true;
+    lastX = e.clientX; lastY = e.clientY;
+    dom.style.cursor = 'grabbing';
+  });
+  window.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    worldGroup.rotation.y += dx * 0.008;
+    worldGroup.rotation.x += dy * 0.008;
+    worldGroup.rotation.x = Math.max(-1.4, Math.min(1.4, worldGroup.rotation.x));
+  });
+  window.addEventListener('pointerup', () => { dragging = false; dom.style.cursor = 'grab'; });
+
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- resize ----------
+  function resize(){
+    const w = stage.clientWidth, h = stage.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  }
+  new ResizeObserver(resize).observe(stage);
+  resize();
+
+  // ---------- render loop ----------
+  function animate(){
+    requestAnimationFrame(animate);
+    if(!dragging && !reduceMotion && !userInteracted){
+      worldGroup.rotation.y += 0.0018;
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
