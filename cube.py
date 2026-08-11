@@ -62,7 +62,59 @@ class Cube:
                 cell = Cell(color = "W", point=(i, -1, j), norm=(0, -1, 0))
                 self.cells.append(cell)
 
+    def move_R(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if x == 1:
+                cell.point = (x, z, -y)
+                nx, ny, nz = cell.norm
+                cell.norm = (nx, nz, -ny)
+
+    def move_L(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if x == -1:
+                cell.point = (x, -z, y)
+                nx, ny, nz = cell.norm
+                cell.norm = (nx, -nz, ny)
+
+    def move_U(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if y == 1:
+                cell.point = (-z, y, x)
+                nx, ny, nz = cell.norm
+                cell.norm = (-nz, ny, nx)
+
+    def move_D(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if y == -1:
+                cell.point = (z, y, -x)
+                nx, ny, nz = cell.norm
+                cell.norm = (nz, ny, -nx)
+
+    def move_F(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if z == 1:
+                cell.point = (y, -x, z)
+                nx, ny, nz = cell.norm
+                cell.norm = (ny, -nx, nz)
+
+    def move_B(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if z == -1:
+                cell.point = (-y, x, z)
+                nx, ny, nz = cell.norm
+                cell.norm = (-ny, nx, nz)
+
+
 if __name__ == "__main__":
     cube = Cube()
     for cell in cube.cells:
         print(cell.point, cell.norm, cell.color)
+    cube.move_R()
+    for cell in cube.cells:
+        print("After move R:", cell.point, cell.norm, cell.color)

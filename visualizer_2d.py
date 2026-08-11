@@ -6,6 +6,7 @@ Run it:
     python3 pygame_visualizer.py
 
 Close the window, or press Esc/Q, to quit.
+Press R/L/U/D/F/B to apply moves.
 
 Drop this file next to your existing cell.py / cube.py -- it imports Cube
 directly, no changes needed on your end.
@@ -74,6 +75,7 @@ def compute_layout(cube):
 
 def main():
     cube = Cube()
+    cube.move_R()  # Example move to demonstrate the visualizer
     layout = compute_layout(cube)
 
     xs = [p[0] for p in layout]
@@ -95,10 +97,36 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_q):
-                running = False
 
+            # --- KEYBOARD CONTROLS ---
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_ESCAPE, pygame.K_q):
+                    running = False
+
+                # Check which key was pressed, apply move, and update layout
+                elif event.key == pygame.K_r:
+                    cube.move_R()
+                    layout = compute_layout(cube)
+                elif event.key == pygame.K_l:
+                    cube.move_L()
+                    layout = compute_layout(cube)
+                elif event.key == pygame.K_u:
+                    cube.move_U()
+                    layout = compute_layout(cube)
+                elif event.key == pygame.K_d:
+                    cube.move_D()
+                    layout = compute_layout(cube)
+                elif event.key == pygame.K_f:
+                    cube.move_F()
+                    layout = compute_layout(cube)
+                elif event.key == pygame.K_b:
+                    cube.move_B()
+                    layout = compute_layout(cube)
+
+        # Draw the background
         screen.fill((25, 25, 25))
+
+        # Draw the stickers based on the (potentially updated) layout
         for wx, wy, color in layout:
             px = (wx - min_x) * SCALE + MARGIN
             py = (max_y - wy) * SCALE + MARGIN  # flip y: screen grows downward
