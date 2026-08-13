@@ -70,6 +70,14 @@ class Cube:
                 nx, ny, nz = cell.norm
                 cell.norm = (nx, nz, -ny)
 
+    def move_R_prime(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if x == 1:
+                cell.point = (x, -z, y)
+                nx, ny, nz = cell.norm
+                cell.norm = (nx, -nz, ny)
+
     def move_L(self):
         for cell in self.cells:
             x, y, z = cell.point
@@ -77,6 +85,14 @@ class Cube:
                 cell.point = (x, -z, y)
                 nx, ny, nz = cell.norm
                 cell.norm = (nx, -nz, ny)
+
+    def move_L_prime(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if x == -1:
+                cell.point = (x, z, -y)
+                nx, ny, nz = cell.norm
+                cell.norm = (nx, nz, -ny)
 
     def move_U(self):
         for cell in self.cells:
@@ -86,6 +102,14 @@ class Cube:
                 nx, ny, nz = cell.norm
                 cell.norm = (-nz, ny, nx)
 
+    def move_U_prime(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if y == 1:
+                cell.point = (z, y, -x)
+                nx, ny, nz = cell.norm
+                cell.norm = (nz, ny, -nx)
+
     def move_D(self):
         for cell in self.cells:
             x, y, z = cell.point
@@ -93,6 +117,14 @@ class Cube:
                 cell.point = (z, y, -x)
                 nx, ny, nz = cell.norm
                 cell.norm = (nz, ny, -nx)
+
+    def move_D_prime(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if y == -1:
+                cell.point = (-z, y, x)
+                nx, ny, nz = cell.norm
+                cell.norm = (-nz, ny, nx)
 
     def move_F(self):
         for cell in self.cells:
@@ -102,6 +134,14 @@ class Cube:
                 nx, ny, nz = cell.norm
                 cell.norm = (ny, -nx, nz)
 
+    def move_F_prime(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if z == 1:
+                cell.point = (-y, x, z)
+                nx, ny, nz = cell.norm
+                cell.norm = (-ny, nx, nz)
+
     def move_B(self):
         for cell in self.cells:
             x, y, z = cell.point
@@ -110,6 +150,45 @@ class Cube:
                 nx, ny, nz = cell.norm
                 cell.norm = (-ny, nx, nz)
 
+    def move_B_prime(self):
+        for cell in self.cells:
+            x, y, z = cell.point
+            if z == -1:
+                cell.point = (y, -x, z)
+                nx, ny, nz = cell.norm
+                cell.norm = (ny, -nx, nz)
+
+    def sequence(self, move_string):
+
+        move_map = {
+            "R": self.move_R,
+            "R'": self.move_R_prime,
+            "L": self.move_L,
+            "L'": self.move_L_prime,
+            "U": self.move_U,
+            "U'": self.move_U_prime,
+            "D": self.move_D,
+            "D'": self.move_D_prime,
+            "F": self.move_F,
+            "F'": self.move_F_prime,
+            "B": self.move_B,
+            "B'": self.move_B_prime
+        }
+
+        if isinstance(move_string, str):
+            move_string = move_string.split()
+
+        for move in move_string:
+            if move in move_map:
+                move_map[move]()
+
+    def scramble(self):
+        import random
+        moves = ["R", "R'", "L", "L'", "U", "U'", "D", "D'", "F", "F'", "B", "B'"]
+
+        num_moves = random.randint(10, 30)
+        scramble_moves = random.choices(moves, k = num_moves)
+        self.sequence(scramble_moves)
 
 if __name__ == "__main__":
     cube = Cube()

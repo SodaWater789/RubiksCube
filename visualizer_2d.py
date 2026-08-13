@@ -75,7 +75,7 @@ def compute_layout(cube):
 
 def main():
     cube = Cube()
-    cube.move_R()  # Example move to demonstrate the visualizer
+    cube.scramble()  # Example move to demonstrate the visualizer
     layout = compute_layout(cube)
 
     xs = [p[0] for p in layout]
